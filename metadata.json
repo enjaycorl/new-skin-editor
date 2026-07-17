@@ -1,0 +1,6 @@
+{
+  "name": "SkinCraft Studio",
+  "description": "Create, edit, and customize Minecraft character skins with 2D texture painting, real-time 3D preview, templates library, and gallery export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
