@@ -3,3 +3,27 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "app"
+mode = "sequential"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "echo '=== Minecraft SkinCraft Studio ===' && echo '' && echo 'This is an Android (Kotlin/Gradle) project.' && echo 'It cannot run directly on Replit — build and run it in Android Studio.' && echo '' && echo 'To build locally:' && echo '  1. Open the project in Android Studio' && echo '  2. Connect an Android device or start an emulator' && echo '  3. Run > Run app  (or Shift+F10)' && echo '' && echo 'Source files are in: app/src/main/java/com/example/' && echo 'Edit code here on Replit, then pull changes locally to build.' && while true; do sleep 3600; done"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "app"
