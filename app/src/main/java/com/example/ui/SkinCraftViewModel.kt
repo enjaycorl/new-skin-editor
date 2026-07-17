@@ -83,6 +83,14 @@ class SkinCraftViewModel(private val repository: SkinProjectRepository) : ViewMo
     private val _is3DAnimating = MutableStateFlow(false)
     val is3DAnimating: StateFlow<Boolean> = _is3DAnimating.asStateFlow()
 
+    // Mirror/Symmetry mode: also paints the horizontally mirrored pixel on the same face
+    private val _mirrorMode = MutableStateFlow(false)
+    val mirrorMode: StateFlow<Boolean> = _mirrorMode.asStateFlow()
+
+    // Brush size in pixels (1-3)
+    private val _brushSize = MutableStateFlow(1)
+    val brushSize: StateFlow<Int> = _brushSize.asStateFlow()
+
     // General states
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
@@ -364,7 +372,16 @@ class SkinCraftViewModel(private val repository: SkinProjectRepository) : ViewMo
         _is3DAnimating.value = anim
     }
 
+    fun toggleMirrorMode() {
+        _mirrorMode.value = !_mirrorMode.value
+    }
+
+    fun setBrushSize(size: Int) {
+        _brushSize.value = size.coerceIn(1, 3)
+    }
+
     // 2D Painting logic
+    // Tools: BRUSH, PENCIL (always 1px), ERASER, TRANSPARENT_BRUSH, BUCKET, EYEDROPPER
     fun paintPixel(faceX: Int, faceY: Int) {
         val proj = _currentProject.value ?: return
         val pixels = _editorPixels.value.clone()
@@ -378,35 +395,59 @@ class SkinCraftViewModel(private val repository: SkinProjectRepository) : ViewMo
         )
 
         if (faceX < 0 || faceX >= mapping.width || faceY < 0 || faceY >= mapping.height) return
+        val (w, _) = SkinTextureMapper.getDimensions(proj.format)
 
-        val targetX = mapping.x + faceX
-        val targetY = mapping.y + faceY
-
-        val (w, h) = SkinTextureMapper.getDimensions(proj.format)
-        val targetIdx = targetY * w + targetX
-        if (targetIdx < 0 || targetIdx >= pixels.size) return
-
-        val oldPixel = pixels[targetIdx]
-        val newPixel = when (_selectedTool.value) {
-            "BRUSH" -> _activeColor.value
-            "ERASER" -> 0 // Transparent
+        // Pick the new pixel color based on active tool
+        val newPixel: Int = when (_selectedTool.value) {
+            "BRUSH", "PENCIL" -> _activeColor.value
+            "ERASER" -> 0 // fully transparent
+            "TRANSPARENT_BRUSH" -> {
+                // 50% alpha overlay of active color
+                val base = _activeColor.value
+                val a = ((base ushr 24) and 0xFF) / 2
+                (base and 0x00FFFFFF) or (a shl 24)
+            }
             "EYEDROPPER" -> {
-                if (oldPixel != 0) {
-                    setColor(oldPixel)
-                }
+                val idx = (mapping.y + faceY) * w + (mapping.x + faceX)
+                if (idx in pixels.indices && pixels[idx] != 0) setColor(pixels[idx])
                 return
             }
             else -> return
         }
 
-        if (oldPixel == newPixel) return
+        // Pencil is always 1px regardless of brushSize setting
+        val effectiveBrushSize = if (_selectedTool.value == "PENCIL") 1 else _brushSize.value
 
-        // Save to Undo stack
+        // Quick no-op check for 1px case
+        if (effectiveBrushSize == 1) {
+            val idx = (mapping.y + faceY) * w + (mapping.x + faceX)
+            if (idx < 0 || idx >= pixels.size || pixels[idx] == newPixel) return
+        }
+
         saveToUndo(pixels)
 
-        pixels[targetIdx] = newPixel
-        _editorPixels.value = pixels
+        // Paint a square of effectiveBrushSize pixels centred on the touch point
+        fun stamp(originFaceX: Int, originFaceY: Int) {
+            val half = effectiveBrushSize / 2
+            for (dy in -half until effectiveBrushSize - half) {
+                for (dx in -half until effectiveBrushSize - half) {
+                    val px = (mapping.x + originFaceX + dx).coerceIn(mapping.x, mapping.x + mapping.width - 1)
+                    val py = (mapping.y + originFaceY + dy).coerceIn(mapping.y, mapping.y + mapping.height - 1)
+                    val idx = py * w + px
+                    if (idx in pixels.indices) pixels[idx] = newPixel
+                }
+            }
+        }
 
+        stamp(faceX, faceY)
+
+        // Mirror mode: also stamp the horizontally reflected pixel on this face
+        if (_mirrorMode.value) {
+            val mirrorFaceX = mapping.width - 1 - faceX
+            stamp(mirrorFaceX, faceY)
+        }
+
+        _editorPixels.value = pixels
         triggerAutoSave()
     }
 

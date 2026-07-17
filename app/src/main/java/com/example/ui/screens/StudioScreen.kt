@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -112,7 +114,17 @@ fun StudioScreen(
     val pixels by viewModel.editorPixels.collectAsState()
 
     val isAnimating by viewModel.is3DAnimating.collectAsState()
+    val mirrorMode by viewModel.mirrorMode.collectAsState()
+    val brushSize by viewModel.brushSize.collectAsState()
     var activeTime by remember { mutableStateOf(0f) }
+
+    // Gallery / file import launcher
+    var showImportOptions by remember { mutableStateOf(false) }
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.importSkinFromGallery(context, it, "Imported Skin") }
+    }
 
     val mapping = remember(activePart, activeFace, activeLayer, activeProject) {
         SkinTextureMapper.getScaledFaceMapping(
@@ -170,42 +182,52 @@ fun StudioScreen(
                         .padding(vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left Column: Download
+                    // Left Column: Download + Import (stacked)
                     Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                val uri = SkinExportUtils.saveSkinToGallery(
-                                    context,
-                                    viewModel.editorPixels.value,
-                                    activeProject.format,
-                                    activeProject.name
-                                )
-                                if (uri != null) {
-                                    exportedUriString = uri.toString()
-                                    showExportSuccess = true
-                                } else {
-                                    Toast.makeText(context, "Export failed. Check permissions.", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                            .testTag("download_top_bar_button"),
+                        modifier = Modifier.weight(1f),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.SaveAlt,
-                            contentDescription = "Download Skin",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.height(3.dp))
-                        Text(
-                            text = "DOWNLOAD",
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.sp
-                        )
+                        // Download row
+                        Row(
+                            modifier = Modifier
+                                .clickable {
+                                    val uri = SkinExportUtils.saveSkinToGallery(
+                                        context,
+                                        viewModel.editorPixels.value,
+                                        activeProject.format,
+                                        activeProject.name
+                                    )
+                                    if (uri != null) {
+                                        exportedUriString = uri.toString()
+                                        showExportSuccess = true
+                                    } else {
+                                        Toast.makeText(context, "Export failed. Check permissions.", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .testTag("download_top_bar_button")
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.SaveAlt, contentDescription = "Download", tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("EXPORT", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        // Import row
+                        Row(
+                            modifier = Modifier
+                                .clickable { showImportOptions = true }
+                                .testTag("import_top_bar_button")
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.FileUpload, contentDescription = "Import", tint = Color(0xFF80CBC4), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("IMPORT", color = Color(0xFF80CBC4), fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+                        }
                     }
 
                     // Vertical Divider
@@ -388,174 +410,254 @@ fun StudioScreen(
                         )
                     }
                 } else {
-                    // 2D Canvas painter Grid inside an elevated glassmorphic card container
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth(0.92f)
-                                .shadow(12.dp, RoundedCornerShape(20.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp)),
-                            colors = CardDefaults.cardColors(containerColor = Color.Black.copy(alpha = 0.72f)),
-                            shape = RoundedCornerShape(20.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        Text(
-                                            text = "2D Editor Grid",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                        Text(
-                                            text = "${activePart.name.replace("_", " ")} • ${activeFace.name} • ${if (activeLayer == LayerType.OUTER) "Outer" else "Inner"}",
-                                            color = Color(0xFF1E88E5),
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(activeColor))
-                                            .border(1.5.dp, Color.White, CircleShape)
+                    // ── 2D PIXEL EDITOR ───────────────────────────────────────────────────
+                    // Full-viewport canvas with pinch-to-zoom/pan and precision pixel drawing
+                    var canvas2DScale by remember { mutableStateOf(1f) }
+                    var canvas2DOffset by remember { mutableStateOf(Offset.Zero) }
+                    var is2DPanMode by remember { mutableStateOf(false) }
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // Dark checkerboard backdrop (shows through transparent pixels)
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val cs = 14f
+                            for (bx in 0 until (size.width / cs).toInt() + 1) {
+                                for (by in 0 until (size.height / cs).toInt() + 1) {
+                                    drawRect(
+                                        color = if ((bx + by) % 2 == 0) Color(0xFF2E2E2E) else Color(0xFF1A1A1A),
+                                        topLeft = Offset(bx * cs, by * cs),
+                                        size = Size(cs, cs)
                                     )
                                 }
+                            }
+                        }
 
-                                Divider(color = Color.White.copy(alpha = 0.15f))
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(230.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .border(2.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                                        .testTag("drawing_grid_container"),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    val (w, h) = SkinTextureMapper.getDimensions(activeProject.format)
-
-                                    Canvas(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .pointerInput(mapping) {
-                                                detectDragGestures(
-                                                    onDragStart = { offset ->
-                                                        val cellW = size.width / mapping.width
-                                                        val cellH = size.height / mapping.height
-                                                        val u = (offset.x / cellW).toInt().coerceIn(0, mapping.width - 1)
-                                                        val v = (offset.y / cellH).toInt().coerceIn(0, mapping.height - 1)
-                                                        if (activeTool == "BUCKET") {
-                                                            viewModel.floodFillFace(u, v)
-                                                        } else {
-                                                            viewModel.paintPixel(u, v)
-                                                        }
-                                                    },
-                                                    onDrag = { change, _ ->
-                                                        change.consume()
-                                                        val cellW = size.width / mapping.width
-                                                        val cellH = size.height / mapping.height
-                                                        val offset = change.position
-                                                        val u = (offset.x / cellW).toInt().coerceIn(0, mapping.width - 1)
-                                                        val v = (offset.y / cellH).toInt().coerceIn(0, mapping.height - 1)
-                                                        if (activeTool != "BUCKET") {
-                                                            viewModel.paintPixel(u, v)
-                                                        }
-                                                    }
-                                                )
-                                            }
-                                            .pointerInput(mapping) {
-                                                detectTapGestures { offset ->
-                                                    val cellW = size.width / mapping.width
-                                                    val cellH = size.height / mapping.height
-                                                    val u = (offset.x / cellW).toInt().coerceIn(0, mapping.width - 1)
-                                                    val v = (offset.y / cellH).toInt().coerceIn(0, mapping.height - 1)
-                                                    if (activeTool == "BUCKET") {
-                                                        viewModel.floodFillFace(u, v)
-                                                    } else {
-                                                        viewModel.paintPixel(u, v)
-                                                    }
-                                                }
-                                            }
-                                    ) {
-                                        val cellW = size.width / mapping.width
-                                        val cellH = size.height / mapping.height
-
-                                        // Checkerboard back
-                                        val checkSize = 10f
-                                        for (cx in 0 until (size.width / checkSize).toInt() + 1) {
-                                            for (cy in 0 until (size.height / checkSize).toInt() + 1) {
-                                                val colorCheck = if ((cx + cy) % 2 == 0) Color.White else Color(0xFFE0E0E0)
-                                                drawRect(
-                                                    color = colorCheck,
-                                                    topLeft = Offset(cx * checkSize, cy * checkSize),
-                                                    size = Size(checkSize, checkSize)
-                                                )
-                                            }
+                        // Main editable canvas
+                        val (texW, texH) = SkinTextureMapper.getDimensions(activeProject.format)
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("drawing_grid_container")
+                                .pointerInput(is2DPanMode) {
+                                    if (is2DPanMode) {
+                                        detectTransformGestures { _, pan, zoom, _ ->
+                                            canvas2DScale = (canvas2DScale * zoom).coerceIn(0.25f, 14f)
+                                            canvas2DOffset += pan
                                         }
-
-                                        // Draw pixel grid data
-                                        if (mapping.x + mapping.width <= w && mapping.y + mapping.height <= h) {
-                                            for (dy in 0 until mapping.height) {
-                                                for (dx in 0 until mapping.width) {
-                                                    val pixelColor = pixels[(mapping.y + dy) * w + (mapping.x + dx)]
-                                                    val alpha = (pixelColor ushr 24) and 0xFF
-                                                    if (alpha > 0) {
-                                                        drawRect(
-                                                            color = Color(pixelColor),
-                                                            topLeft = Offset(dx * cellW, dy * cellH),
-                                                            size = Size(cellW + 0.5f, cellH + 0.5f)
-                                                        )
-                                                    }
-                                                }
-                                            }
+                                    }
+                                }
+                                .pointerInput(mapping, canvas2DScale, canvas2DOffset, is2DPanMode, activeTool) {
+                                    if (!is2DPanMode) {
+                                        fun toGrid(pos: Offset): Pair<Int, Int> {
+                                            val base = minOf(size.width, size.height) * 0.82f
+                                            val total = base * canvas2DScale
+                                            val ox = size.width / 2f + canvas2DOffset.x - total / 2f
+                                            val oy = size.height / 2f + canvas2DOffset.y - (total * mapping.height / mapping.width) / 2f
+                                            val cellW = total / mapping.width
+                                            val cellH = total / mapping.width  // square cells
+                                            val u = ((pos.x - ox) / cellW).toInt().coerceIn(0, mapping.width - 1)
+                                            val v = ((pos.y - oy) / cellH).toInt().coerceIn(0, mapping.height - 1)
+                                            return Pair(u, v)
                                         }
-
-                                        // Grid lines
-                                        if (show2DGrid) {
-                                            for (i in 0..mapping.width) {
-                                                val lineX = i * cellW
-                                                drawLine(
-                                                    color = Color.LightGray.copy(alpha = 0.6f),
-                                                    start = Offset(lineX, 0f),
-                                                    end = Offset(lineX, size.height),
-                                                    strokeWidth = 1f
-                                                )
+                                        detectDragGestures(
+                                            onDragStart = { offset ->
+                                                val (u, v) = toGrid(offset)
+                                                if (activeTool == "BUCKET") viewModel.floodFillFace(u, v)
+                                                else viewModel.paintPixel(u, v)
+                                            },
+                                            onDrag = { change, _ ->
+                                                change.consume()
+                                                val (u, v) = toGrid(change.position)
+                                                if (activeTool != "BUCKET") viewModel.paintPixel(u, v)
                                             }
-                                            for (j in 0..mapping.height) {
-                                                val lineY = j * cellH
-                                                drawLine(
-                                                    color = Color.LightGray.copy(alpha = 0.6f),
-                                                    start = Offset(0f, lineY),
-                                                    end = Offset(size.width, lineY),
-                                                    strokeWidth = 1f
-                                                )
+                                        )
+                                    }
+                                }
+                                .pointerInput(mapping, canvas2DScale, canvas2DOffset, is2DPanMode, activeTool) {
+                                    if (!is2DPanMode) {
+                                        fun toGrid(pos: Offset): Pair<Int, Int> {
+                                            val base = minOf(size.width, size.height) * 0.82f
+                                            val total = base * canvas2DScale
+                                            val ox = size.width / 2f + canvas2DOffset.x - total / 2f
+                                            val oy = size.height / 2f + canvas2DOffset.y - (total * mapping.height / mapping.width) / 2f
+                                            val cellW = total / mapping.width
+                                            val cellH = total / mapping.width
+                                            val u = ((pos.x - ox) / cellW).toInt().coerceIn(0, mapping.width - 1)
+                                            val v = ((pos.y - oy) / cellH).toInt().coerceIn(0, mapping.height - 1)
+                                            return Pair(u, v)
+                                        }
+                                        detectTapGestures { offset ->
+                                            val (u, v) = toGrid(offset)
+                                            if (activeTool == "BUCKET") viewModel.floodFillFace(u, v)
+                                            else viewModel.paintPixel(u, v)
+                                        }
+                                    }
+                                }
+                        ) {
+                            val base = minOf(size.width, size.height) * 0.82f
+                            val total = base * canvas2DScale
+                            val cellW = total / mapping.width
+                            val cellH = cellW  // square pixels
+                            val gridH = cellH * mapping.height
+                            val ox = size.width / 2f + canvas2DOffset.x - total / 2f
+                            val oy = size.height / 2f + canvas2DOffset.y - gridH / 2f
+
+                            // White checkerboard inside grid area (transparency indicator)
+                            val checkPx = (cellW / 2f).coerceIn(2f, 10f)
+                            val cols = (total / checkPx).toInt() + 1
+                            val rows = (gridH / checkPx).toInt() + 1
+                            for (cx2 in 0 until cols) {
+                                for (cy2 in 0 until rows) {
+                                    drawRect(
+                                        color = if ((cx2 + cy2) % 2 == 0) Color.White else Color(0xFFD0D0D0),
+                                        topLeft = Offset(ox + cx2 * checkPx, oy + cy2 * checkPx),
+                                        size = Size(checkPx + 0.5f, checkPx + 0.5f)
+                                    )
+                                }
+                            }
+
+                            // Draw all pixels for the active face
+                            if (mapping.x + mapping.width <= texW && mapping.y + mapping.height <= texH) {
+                                for (dy in 0 until mapping.height) {
+                                    for (dx in 0 until mapping.width) {
+                                        val pixelColor = pixels[(mapping.y + dy) * texW + (mapping.x + dx)]
+                                        val alpha = (pixelColor ushr 24) and 0xFF
+                                        if (alpha > 0) {
+                                            drawRect(
+                                                color = Color(pixelColor),
+                                                topLeft = Offset(ox + dx * cellW, oy + dy * cellH),
+                                                size = Size(cellW + 0.5f, cellH + 0.5f)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Mirror/symmetry centre line
+                            if (mirrorMode) {
+                                val midX = ox + total / 2f
+                                drawLine(
+                                    color = Color(0xFFFFD600).copy(alpha = 0.9f),
+                                    start = Offset(midX, oy),
+                                    end = Offset(midX, oy + gridH),
+                                    strokeWidth = 2.5f
+                                )
+                                // Dashed visual: small ticks on mirror line
+                                for (t in 0 until (gridH / 12).toInt()) {
+                                    if (t % 2 == 0) {
+                                        drawLine(
+                                            color = Color.Black.copy(alpha = 0.4f),
+                                            start = Offset(midX, oy + t * 12f),
+                                            end = Offset(midX, oy + t * 12f + 6f),
+                                            strokeWidth = 2f
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Pixel grid lines (only when cell size > 4px to avoid clutter)
+                            if (show2DGrid && cellW > 4f) {
+                                for (i in 0..mapping.width) {
+                                    val lx = ox + i * cellW
+                                    drawLine(Color.Gray.copy(alpha = 0.45f), Offset(lx, oy), Offset(lx, oy + gridH), 0.7f)
+                                }
+                                for (j in 0..mapping.height) {
+                                    val ly = oy + j * cellH
+                                    drawLine(Color.Gray.copy(alpha = 0.45f), Offset(ox, ly), Offset(ox + total, ly), 0.7f)
+                                }
+                            }
+
+                            // Grid border
+                            drawRect(
+                                color = Color.White.copy(alpha = 0.55f),
+                                topLeft = Offset(ox, oy),
+                                size = Size(total, gridH),
+                                style = Stroke(width = 2f)
+                            )
+                        }
+
+                        // Top info bar overlay
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.TopCenter)
+                                .background(Color.Black.copy(alpha = 0.72f))
+                                .padding(horizontal = 14.dp, vertical = 5.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "${activePart.name.replace("_", " ")} · ${activeFace.name} · ${if (activeLayer == LayerType.INNER) "Base" else "Overlay"}",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                                val toolLabel = when (activeTool) {
+                                    "BRUSH" -> "Brush (${brushSize}px)"
+                                    "PENCIL" -> "Pencil (1px)"
+                                    "ERASER" -> "Eraser (${brushSize}px)"
+                                    "TRANSPARENT_BRUSH" -> "Transparent Brush"
+                                    "BUCKET" -> "Paint Bucket"
+                                    "EYEDROPPER" -> "Eyedropper / Pick"
+                                    else -> activeTool
+                                }
+                                Text(
+                                    text = if (mirrorMode) "⬡ MIRROR · $toolLabel" else toolLabel,
+                                    color = if (mirrorMode) Color(0xFFFFD600) else Color.White.copy(alpha = 0.65f),
+                                    fontSize = 10.sp
+                                )
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                if (activeTool in listOf("BRUSH", "ERASER")) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        listOf(1, 2, 3).forEach { sz ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(22.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (brushSize == sz) Color(0xFF1976D2) else Color.White.copy(alpha = 0.18f))
+                                                    .border(1.dp, Color.White.copy(alpha = 0.45f), CircleShape)
+                                                    .clickable { viewModel.setBrushSize(sz) },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(sz.toString(), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                             }
                                         }
                                     }
                                 }
-
-                                Text(
-                                    text = "Drag or tap on grid to paint pixels",
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace
+                                Box(
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(activeColor))
+                                        .border(1.5.dp, Color.White, CircleShape)
                                 )
                             }
+                        }
+
+                        // Pan / Draw mode toggle + Reset zoom — bottom-left
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(start = 72.dp, bottom = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            SmallFloatingButton(
+                                icon = if (is2DPanMode) Icons.Default.Edit else Icons.Default.PanTool,
+                                contentDescription = if (is2DPanMode) "Draw mode" else "Pan/Zoom mode",
+                                onClick = { is2DPanMode = !is2DPanMode },
+                                testTag = "pan_mode_toggle_button"
+                            )
+                            SmallFloatingButton(
+                                icon = Icons.Default.CenterFocusStrong,
+                                contentDescription = "Reset zoom",
+                                onClick = { canvas2DScale = 1f; canvas2DOffset = Offset.Zero },
+                                testTag = "reset_2d_zoom_button"
+                            )
                         }
                     }
                 }
@@ -613,6 +715,42 @@ fun StudioScreen(
                         isSelected = activeTool == "EYEDROPPER",
                         testTag = "tool_button_EYEDROPPER"
                     )
+
+                    // Pencil Tool (always 1px, precision drawing)
+                    FloatingToolbarButton(
+                        icon = Icons.Default.Create,
+                        contentDescription = "Pencil Tool (1px)",
+                        onClick = { viewModel.setTool("PENCIL") },
+                        isSelected = activeTool == "PENCIL",
+                        testTag = "tool_button_PENCIL"
+                    )
+
+                    // Transparent Brush (50% alpha strokes for layered shading)
+                    FloatingToolbarButton(
+                        icon = Icons.Default.WaterDrop,
+                        contentDescription = "Transparent Brush",
+                        onClick = { viewModel.setTool("TRANSPARENT_BRUSH") },
+                        isSelected = activeTool == "TRANSPARENT_BRUSH",
+                        testTag = "tool_button_TRANSPARENT_BRUSH"
+                    )
+
+                    // Mirror/Symmetry mode toggle (yellow when active)
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .shadow(4.dp, CircleShape)
+                            .clip(CircleShape)
+                            .background(if (mirrorMode) Color(0xFFFF8F00) else Color(0xFF1976D2).copy(alpha = 0.85f))
+                            .border(1.5.dp, if (mirrorMode) Color(0xFFFFD600) else Color.White, CircleShape)
+                            .clickable { viewModel.toggleMirrorMode() }
+                            .testTag("mirror_mode_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Flip, contentDescription = "Mirror Mode", tint = Color.White, modifier = Modifier.size(18.dp))
+                            Text("MIRROR", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
 
                     // Undo & Redo Row
                     Row(
@@ -706,10 +844,10 @@ fun StudioScreen(
                         testTag = "grid_overlay_toggle_button"
                     )
 
-                    // Pencil Brush Button
+                    // Brush Tool (multi-pixel, respects brush size)
                     FloatingToolbarButton(
                         icon = Icons.Default.Edit,
-                        contentDescription = "Pencil Brush Tool",
+                        contentDescription = "Brush Tool",
                         onClick = { viewModel.setTool("BRUSH") },
                         isSelected = activeTool == "BRUSH",
                         testTag = "tool_button_BRUSH"
@@ -1073,6 +1211,61 @@ fun StudioScreen(
             confirmButton = {
                 Button(onClick = { showExportSuccess = false }) {
                     Text("Awesome")
+                }
+            }
+        )
+    }
+
+    // Import Skin Dialog — gallery (PNG/JPG) or file picker
+    if (showImportOptions) {
+        AlertDialog(
+            onDismissRequest = { showImportOptions = false },
+            icon = {
+                Icon(
+                    Icons.Default.FileUpload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp)
+                )
+            },
+            title = {
+                Text("Import Skin", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Choose a skin PNG file from your device. The file should be a standard Minecraft skin (64×64, 64×32, or 128×128 pixels).",
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = {
+                            showImportOptions = false
+                            galleryLauncher.launch("image/*")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Photo, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Gallery / Photos")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            showImportOptions = false
+                            galleryLauncher.launch("image/png")
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("File Storage (PNG)")
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showImportOptions = false }) {
+                    Text("Cancel")
                 }
             }
         )
