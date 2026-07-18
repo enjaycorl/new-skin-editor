@@ -918,23 +918,13 @@ fun StudioScreen(
                     }
                 }
 
-                // Bottom-right Expandable Body part selection card panel
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(bottom = 16.dp, end = 16.dp)
-                ) {
-                    if (!showBodyPanel) {
-                        // Body silhouette schematic button
-                        FloatingToolbarButton(
-                            icon = Icons.Default.Person,
-                            contentDescription = "Body Selector Panel",
-                            onClick = { showBodyPanel = true },
-                            isSelected = false,
-                            testTag = "body_panel_trigger_button"
-                        )
-                    } else {
-                        // The Body Selection Overlay card
+                // Body selection panel overlay — triggered from the bottom centre row
+                if (showBodyPanel) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 16.dp)
+                    ) {
                         Card(
                             modifier = Modifier
                                 .width(280.dp)
@@ -1064,24 +1054,101 @@ fun StudioScreen(
                 }
             }
 
-            // 5. Solid Red Bottom Action Bar ("Edit")
+            // 5b. Bottom centre action row — Body Part selector + Layer visibility
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.68f))
+                    .padding(horizontal = 32.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Body / face selector trigger
+                Box(
+                    modifier = Modifier
+                        .size(50.dp)
+                        .shadow(4.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(if (showBodyPanel) Color(0xFF0D47A1) else Color(0xFF1976D2).copy(alpha = 0.85f))
+                        .border(1.5.dp, Color.White, CircleShape)
+                        .clickable { showBodyPanel = !showBodyPanel }
+                        .testTag("body_panel_bottom_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = "Body Selector",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(32.dp))
+
+                // Outer-layer (jacket/hat) visibility toggle
+                Box(
+                    modifier = Modifier
+                        .size(50.dp)
+                        .shadow(4.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(
+                            if (showOuterLayerOnly) Color(0xFF1976D2).copy(alpha = 0.85f)
+                            else Color.Gray.copy(alpha = 0.55f)
+                        )
+                        .border(1.5.dp, Color.White, CircleShape)
+                        .clickable { showOuterLayerOnly = !showOuterLayerOnly }
+                        .testTag("layer_visibility_bottom_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (showOuterLayerOnly) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = "Toggle outer layer",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+            }
+
+            // 5. Solid Red Bottom Action Bar — "Edit" in 3D view, "← 3D View" in 2D mode
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFC62828))
-                    .clickable { showBodyPanel = !showBodyPanel }
-                    .padding(vertical = 12.dp)
+                    .clickable { selectedTab = if (selectedTab == 1) 0 else 1 }
+                    .padding(vertical = 13.dp)
                     .navigationBarsPadding(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "Edit Mode • ${activePart.name.replace("_", " ")} [${activeFace.name}]",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    letterSpacing = 1.sp
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    if (selectedTab == 0) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text(
+                        text = if (selectedTab == 1) "Edit" else "3D Preview",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.sp
+                    )
+                    if (selectedTab == 1) {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Icon(
+                            Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.75f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
         }
     }

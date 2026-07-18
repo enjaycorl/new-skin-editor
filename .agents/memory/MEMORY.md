@@ -1,0 +1,2 @@
+- [Studio Screen Layout](studio-screen-layout.md) — 3D is the default tab (selectedTab=1); "Edit" bar switches to 2D pixel editor, "3D Preview" returns to 3D.
+- [App Icon Design](app-icon-design.md) — Adaptive icon uses vector foreground (pixel-art Minecraft character face + paint brush) over a blue/navy/teal vector background; NOT a photo/JPEG reference.
